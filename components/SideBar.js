@@ -1,25 +1,48 @@
 import React from "react";
 import styled from "styled-components";
 import * as EmailValidator from "email-validator";
+import { AUTH, FIRESTORE } from "../db/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useCollection } from "react-firebase-hooks/firestore";
 
 const SideBar = () => {
+	const [user] = useAuthState(AUTH);
+	const userChatRef = FIRESTORE.collection("chats").where(
+		"users",
+		"array-contains",
+		user.email
+	);
+	const [chatSnapShot] = useCollection(userChatRef);
+
 	const createChat = () => {
 		const input = prompt(
 			"Please enter an andress email of the user you want to chat with"
 		);
 
-		if (!input) {
-			return null;
-		}
-		if (EmailValidator.validate(input)) {
-			//TODO: add the chat to the db
+		if (!input) return null;
+
+		if (
+			EmailValidator.validate(input) &&
+			!chatAlreadyExists(input) &&
+			input !== user.email
+		) {
+			// add chat is it doesnt already exists
+			FIRESTORE.collection("chats").add({
+				users: [user.email, input],
+			});
 		}
 	};
+
+	const chatAlreadyExists = (recipientEmail) =>
+		!!chatSnapShot?.docs.find(
+			(chat) =>
+				chat.data().users.find((user) => user === recipientEmail)?.length > 0
+		);
 
 	return (
 		<SideBarContainer>
 			<SideBarHeader>
-				<i className="fas fa-user-circle"></i>
+				<i onClick={() => AUTH.signOut()} className="fas fa-user-circle"></i>
 				<IconContainer>
 					<i className="fas fa-comment-dots"></i>
 					<i className="fas fa-ellipsis-v"></i>
@@ -32,6 +55,9 @@ const SideBar = () => {
 			<SideBarButton onClick={createChat}>START A NEW CHAT</SideBarButton>
 
 			{/* chats list  */}
+			{chatSnapShot.map((chat) => 
+			<Chat key={chat.id} id={chat.id} user={chat.user}/>
+ 			)}
 		</SideBarContainer>
 	);
 };
@@ -92,5 +118,5 @@ const SideBarButton = styled.button`
 	padding: 10px 0;
 	color: white;
 	font-weight: bolder;
-	background-color: darkcyan;
+	background-color: purple;
 `;
